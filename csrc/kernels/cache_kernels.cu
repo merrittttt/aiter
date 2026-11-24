@@ -54,6 +54,15 @@ __device__ __forceinline__ int64_t load_slot_index(const void* __restrict__ slot
                      static_cast<const int32_t*>(slot_mapping)[token_idx]);
 }
 
+// The other cache writers read slot_mapping as int64_t only. An int32 tensor would be read
+// as pairs of slots, which index far outside the cache, so they reject it.
+inline void check_slot_mapping_int64(const aiter_tensor_t& slot_mapping)
+{
+    AITER_CHECK(slot_mapping.dtype() == AITER_DTYPE_i64,
+                "slot_mapping must be int64 for this op, got ",
+                AiterDtype_to_str(slot_mapping.dtype()));
+}
+
 inline SlotIndexWidth slot_index_width(const aiter_tensor_t& slot_mapping)
 {
     AITER_CHECK(slot_mapping.dtype() == AITER_DTYPE_i32 ||
@@ -4868,6 +4877,7 @@ void reshape_and_cache_with_pertoken_quant(
     aiter_tensor_t& slot_mapping,     // [num_tokens]
     const bool asm_layout)
 {
+    check_slot_mapping_int64(slot_mapping);
     int num_tokens    = key.size(0);
     int num_heads     = key.size(1);
     int head_size     = key.size(2);
@@ -4947,6 +4957,7 @@ void reshape_and_cache_with_block_quant(
     aiter_tensor_t& slot_mapping,     // [num_tokens]
     const bool asm_layout)
 {
+    check_slot_mapping_int64(slot_mapping);
     int batch_size = key.size(0);
     int seq_len    = key.size(1);
     int num_heads  = key.size(2);
@@ -5031,6 +5042,7 @@ void reshape_and_cache_with_block_quant_for_asm_pa(
     const bool asm_layout,
     const int ori_block_size)
 {
+    check_slot_mapping_int64(slot_mapping);
     AITER_CHECK(
         key.dim() == 4 && value.dim() == 4,
         "key/value must be a 4D tensor with shape [batch_size, seq_len, num_heads, head_size]");
@@ -5118,6 +5130,7 @@ void concat_and_cache_mla(aiter_tensor_t& kv_c,         // [num_tokens, kv_lora_
                           const std::string& kv_cache_dtype,
                           aiter_tensor_t& scale)
 {
+    check_slot_mapping_int64(slot_mapping);
     int num_tokens   = slot_mapping.size(0);
     int kv_lora_rank = kv_c.size(1);
     int pe_dim       = k_pe.size(1);
@@ -5155,6 +5168,7 @@ void concat_and_cache_mla_seg(aiter_tensor_t& kv_c,         // [num_tokens, kv_l
                               const std::string& kv_cache_dtype,
                               aiter_tensor_t& scale)
 {
+    check_slot_mapping_int64(slot_mapping);
     int num_tokens   = slot_mapping.size(0);
     int kv_lora_rank = kv_c.size(-1);
     int pe_dim       = k_pe.size(-1);
@@ -5213,6 +5227,7 @@ void indexer_k_quant_and_cache(aiter_tensor_t& k,        // [num_tokens, head_di
                                const std::string& scale_fmt,
                                bool preshuffle)
 {
+    check_slot_mapping_int64(slot_mapping);
     int num_tokens       = std::min(k.size(0), slot_mapping.size(0));
     int head_dim         = k.size(1);
     int cache_block_size = kv_cache.size(1);
@@ -5914,6 +5929,7 @@ void fused_qk_rope_concat_and_cache_mla(
     bool is_neox, bool is_nope_first,
     bool compute_all_q_rope
 ) {
+  check_slot_mapping_int64(slot_mapping);
   int num_tokens = slot_mapping.size(0);
   int kv_lora_rank = kv_c.size(-1);
   int pe_dim = k_pe.size(-1);
@@ -6225,6 +6241,7 @@ void fused_qk_rope_concat_and_cache_mla_seg(
     bool is_neox,
     bool is_nope_first)
 {
+    check_slot_mapping_int64(slot_mapping);
     AITER_CHECK(is_nope_first, "is_nope_first=false is not supported yet");
 
     constexpr int KV_LORA   = 512;
