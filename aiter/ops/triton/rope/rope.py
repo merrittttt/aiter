@@ -943,7 +943,7 @@ def _rope_cached_thd_2c_fwd(
         else:
             SPLIT_H_SIZE = h
 
-        SPLIT_H = (triton.next_power_of_2(h) + SPLIT_H_SIZE - 1) // SPLIT_H_SIZE
+        SPLIT_H = triton.cdiv(h, SPLIT_H_SIZE)
         grid = (SPLIT_H, SPLIT_T, 1)
         num_warps = 4
         waves_per_eu = 0
@@ -965,6 +965,7 @@ def _rope_cached_thd_2c_fwd(
             *out_x.stride(),
             *out_y.stride(),
             t,
+            h,
             HAVE_NOPE=have_nope,
             NOPE_FIRST=nope_first,
             INPLACE=inplace,
@@ -1259,7 +1260,7 @@ def _rope_cached_thd_positions_offsets_2c_bwd(
         else:
             SPLIT_H_SIZE = h
 
-        SPLIT_H = (triton.next_power_of_2(h) + SPLIT_H_SIZE - 1) // SPLIT_H_SIZE
+        SPLIT_H = triton.cdiv(h, SPLIT_H_SIZE)
         grid = (SPLIT_H, SPLIT_T, 1)
         num_warps = 4
         waves_per_eu = 0
@@ -1281,6 +1282,7 @@ def _rope_cached_thd_positions_offsets_2c_bwd(
             *out_x.stride(),
             *out_y.stride(),
             t,
+            h,
             HAVE_NOPE=have_nope,
             NOPE_FIRST=nope_first,
             INPLACE=inplace,

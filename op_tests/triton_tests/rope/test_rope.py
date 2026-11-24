@@ -1005,6 +1005,45 @@ def test_rope_cached_thd_2c_bwd(
     torch.testing.assert_close(triton_out_y, torch_out_y, atol=1e-3, rtol=1e-1)
 
 
+# q and k with the same head count use the SPLIT_H kernels; H is not a power of two.
+@pytest.mark.parametrize("T", [4, 320])
+@pytest.mark.parametrize("H", [12, 28])
+@pytest.mark.parametrize("inplace", [False, True])
+def test_rope_cached_thd_2c_fwd_mha_heads(T: int, H: int, inplace: bool):
+    test_rope_cached_thd_2c_fwd(
+        T=T,
+        QH_per_KH=1,
+        KH=H,
+        D=64,
+        rotate_style=RotateStyle.NEOX,
+        reuse_freqs_front_part=False,
+        nope=False,
+        nope_first=False,
+        dtype=torch.bfloat16,
+        pos=True,
+        offs=False,
+        inplace=inplace,
+    )
+
+
+@pytest.mark.parametrize("T", [4, 320])
+@pytest.mark.parametrize("H", [12, 28])
+def test_rope_cached_thd_2c_bwd_mha_heads(T: int, H: int):
+    test_rope_cached_thd_2c_bwd(
+        T=T,
+        QH_per_KH=1,
+        KH=H,
+        D=64,
+        rotate_style=RotateStyle.NEOX,
+        reuse_freqs_front_part=False,
+        nope=False,
+        nope_first=False,
+        dtype=torch.bfloat16,
+        pos=True,
+        offs=True,
+    )
+
+
 @pytest.mark.parametrize("B", [1, 16, 57])
 @pytest.mark.parametrize("H", [1])
 @pytest.mark.parametrize("D", [64])  # TODO 256 with height/width =64 is too slow.

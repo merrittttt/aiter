@@ -905,6 +905,7 @@ def _rope_kernel_thd_cached_2c_fwd(
     stride_out_y_h,
     stride_out_y_d,
     T,
+    H,
     HAVE_NOPE: tl.constexpr,
     NOPE_FIRST: tl.constexpr,
     INPLACE: tl.constexpr,
@@ -979,7 +980,7 @@ def _rope_kernel_thd_cached_2c_fwd(
 
     h_start_idx = h_s * SPLIT_H_SIZE
 
-    x_mask = t_mask[:, None] & (d_offs < BLOCK_D)[None, :]
+    td_mask = t_mask[:, None] & (d_offs < BLOCK_D)[None, :]
 
     if IS_NEOX:
         x_rotated_mask = (d_offs < BLOCK_D_HALF)[None, :]
@@ -988,6 +989,8 @@ def _rope_kernel_thd_cached_2c_fwd(
 
     d_offs += nope_offs
     for h in tl.range(0, SPLIT_H_SIZE, 1, num_stages=num_stages):
+        # The last head group can be partial when SPLIT_H_SIZE does not divide H.
+        x_mask = tl.where(h_start_idx + h < H, td_mask, False)
         x_offs = (
             t_offs[:, None] * stride_x_t
             + d_offs[None, :] * stride_x_d
@@ -1101,6 +1104,7 @@ def _rope_kernel_thd_cached_2c_bwd(
     stride_out_y_h,
     stride_out_y_d,
     T,
+    H,
     HAVE_NOPE: tl.constexpr,
     NOPE_FIRST: tl.constexpr,
     INPLACE: tl.constexpr,
@@ -1175,7 +1179,7 @@ def _rope_kernel_thd_cached_2c_bwd(
 
     h_start_idx = h_s * SPLIT_H_SIZE
 
-    x_mask = t_mask[:, None] & (d_offs < BLOCK_D)[None, :]
+    td_mask = t_mask[:, None] & (d_offs < BLOCK_D)[None, :]
 
     if IS_NEOX:
         x_rotated_mask = (d_offs < BLOCK_D_HALF)[None, :]
@@ -1184,6 +1188,8 @@ def _rope_kernel_thd_cached_2c_bwd(
 
     d_offs += nope_offs
     for h in tl.range(0, SPLIT_H_SIZE, 1, num_stages=num_stages):
+        # The last head group can be partial when SPLIT_H_SIZE does not divide H.
+        x_mask = tl.where(h_start_idx + h < H, td_mask, False)
         x_offs = (
             t_offs[:, None] * stride_x_t
             + d_offs[None, :] * stride_x_d
