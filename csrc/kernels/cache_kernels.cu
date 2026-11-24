@@ -3399,7 +3399,8 @@ __global__ void fused_qk_rope_concat_and_cache_mla_seg_kernel(
       static constexpr int32_t q_ooba_o = 4 / sizeof(query_t);
       const int64_t q_input_span        = (num_heads - 1) * static_cast<int64_t>(q_nope_stride_1) + kv_lora_dim;
       const int64_t q_oob_i             = (q_input_span + ooba_i - 1) / ooba_i * ooba_i;
-      const int32_t q_oob_o             = (num_heads * head_size + q_ooba_o - 1) / q_ooba_o * q_ooba_o;
+      const int64_t q_output_span       = (num_heads - 1) * static_cast<int64_t>(q_out_stride_1) + head_size;
+      const int32_t q_oob_o             = (q_output_span + q_ooba_o - 1) / q_ooba_o * q_ooba_o;
       auto const* q_ptr_i               = reinterpret_cast<scalar_t const*>(q_nope + token_idx * q_nope_stride_0);
 
       auto* q_ptr_o                     = reinterpret_cast<query_t*>(q_out + q_out_stride_0 * token_idx);
@@ -3635,8 +3636,11 @@ __global__ void fused_qk_rope_concat_and_cache_mla_seg_kernel(
       const int64_t qH_per_kH = num_heads;
       const int64_t kv_lora_dim = 512; // extend: = kv_lora_rank
       const int64_t head_size = kv_lora_dim + pe_dim;
-      const int32_t oob_i             = (kv_lora_dim * num_kv_heads + ooba_i - 1) / ooba_i * ooba_i;
-      const int32_t oob_o             = (head_size * num_kv_heads + ooba_o - 1) / ooba_o * ooba_o;
+      // The heads are kv_c_stride_1, kv_cache_stride_h and q_out_stride_1 apart.
+      const int64_t input_span        = (num_kv_heads - 1) * static_cast<int64_t>(kv_c_stride_1) + kv_lora_dim;
+      const int64_t output_span       = (num_kv_heads - 1) * static_cast<int64_t>(kv_cache_stride_h) + head_size;
+      const int32_t oob_i             = (input_span + ooba_i - 1) / ooba_i * ooba_i;
+      const int32_t oob_o             = (output_span + ooba_o - 1) / ooba_o * ooba_o;
       int32_t nope_offset = 0;
       if constexpr (!is_nope_first) {
         nope_offset = pe_dim;
@@ -3653,7 +3657,8 @@ __global__ void fused_qk_rope_concat_and_cache_mla_seg_kernel(
       static constexpr int32_t q_ooba_o = 4 / sizeof(query_t);
       const int64_t q_input_span = (num_heads - 1) * static_cast<int64_t>(q_nope_stride_1) + kv_lora_dim;
       const int64_t q_oob_i = (q_input_span + ooba_i - 1) / ooba_i * ooba_i;
-      const int32_t q_oob_o = (num_heads * head_size + q_ooba_o - 1) / q_ooba_o * q_ooba_o;
+      const int64_t q_output_span = (num_heads - 1) * static_cast<int64_t>(q_out_stride_1) + head_size;
+      const int32_t q_oob_o = (q_output_span + q_ooba_o - 1) / q_ooba_o * q_ooba_o;
       
       // Use opus::make_gmem for Q buffers, size in BYTES
       auto q_buffer_i = opus::make_gmem<scalar_t>(q_nope + token_idx * q_nope_stride_0, q_oob_i * sizeof(scalar_t));
@@ -3948,8 +3953,11 @@ __global__ void fused_qk_rope_concat_and_cache_mla_seg_kernel(
       // Use kv_lora_rank parameter instead of hardcoded 512
       const int64_t kv_lora_dim = kv_lora_rank;
       const int64_t head_size = kv_lora_dim + pe_dim;
-      const int32_t oob_i = (kv_lora_dim * num_kv_heads + ooba_i - 1) / ooba_i * ooba_i;
-      const int32_t oob_o = (head_size * num_kv_heads + ooba_o - 1) / ooba_o * ooba_o;
+      // The heads are kv_c_stride_1, kv_cache_stride_h and q_out_stride_1 apart.
+      const int64_t input_span        = (num_kv_heads - 1) * static_cast<int64_t>(kv_c_stride_1) + kv_lora_dim;
+      const int64_t output_span       = (num_kv_heads - 1) * static_cast<int64_t>(kv_cache_stride_h) + head_size;
+      const int32_t oob_i             = (input_span + ooba_i - 1) / ooba_i * ooba_i;
+      const int32_t oob_o             = (output_span + ooba_o - 1) / ooba_o * ooba_o;
       
       int32_t nope_offset = 0;
       if constexpr (!is_nope_first) {
@@ -3967,7 +3975,8 @@ __global__ void fused_qk_rope_concat_and_cache_mla_seg_kernel(
       static constexpr int32_t q_ooba_o = 4 / sizeof(query_t);
       const int64_t q_input_span = (num_heads - 1) * static_cast<int64_t>(q_nope_stride_1) + kv_lora_dim;
       const int64_t q_oob_i = (q_input_span + ooba_i - 1) / ooba_i * ooba_i;
-      const int32_t q_oob_o = (num_heads * head_size + q_ooba_o - 1) / q_ooba_o * q_ooba_o;
+      const int64_t q_output_span = (num_heads - 1) * static_cast<int64_t>(q_out_stride_1) + head_size;
+      const int32_t q_oob_o = (q_output_span + q_ooba_o - 1) / q_ooba_o * q_ooba_o;
       
       auto q_buffer_i = opus::make_gmem<scalar_t>(q_nope + token_idx * q_nope_stride_0, q_oob_i * sizeof(scalar_t));
       auto q_buffer_o = opus::make_gmem<query_t>(q_out + q_out_stride_0 * token_idx + nope_offset, q_oob_o * sizeof(query_t));
