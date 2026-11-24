@@ -247,7 +247,23 @@ def _fused_qk_rmsnorm(
         k_out = torch.empty_like(k, dtype=k.dtype, device=k.device)
 
     m = q.size(0)
-    if m >= _FUSED_QK_FALLBACK_M:
+    if q.size(-1) % 2 or k.size(-1) % 2:
+        # The HIP kernel bounds a row in whole 4-byte words, so an odd row of
+        # 16-bit elements would read and write the first element of the next row.
+        # Such widths run on the OPUS kernel, which bounds rows exactly.
+        from .rmsnorm import rms_norm_opus
+
+        for out, x, w, eps in (
+            (q_out, q, q_weight, q_eps),
+            (k_out, k, k_weight, k_eps),
+        ):
+            if out.is_contiguous():
+                rms_norm_opus(out, x, w, eps)
+            else:
+                tmp = torch.empty_like(x, memory_format=torch.contiguous_format)
+                rms_norm_opus(tmp, x, w, eps)
+                out.copy_(tmp)
+    elif m >= _FUSED_QK_FALLBACK_M:
         from .rmsnorm import rmsnorm
 
         rmsnorm(q_out, q, q_weight, q_eps)

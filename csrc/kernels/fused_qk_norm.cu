@@ -206,6 +206,11 @@ void fused_qk_rmsnorm(aiter_tensor_t& q,
     int m        = q.size(0);
     int q_n      = q.size(1);
     int k_n      = k.size(1);
+    // The kernel bounds a row in whole 4-byte words: an odd row of 16-bit elements
+    // would read and write the first element of the next row.
+    AITER_CHECK(q_n % 2 == 0 && k_n % 2 == 0,
+                "fused_qk_rmsnorm needs an even row width, got q_n = ", q_n,
+                ", k_n = ", k_n);
     int max_n    = q_n > k_n ? q_n : k_n;
     int q_in_stride  = q.stride(0);
     int k_in_stride  = k.stride(0);
