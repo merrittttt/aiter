@@ -1235,3 +1235,32 @@ def test_rope_fwd_3d(
     )
     logger.info("\n sp_rank=%d test success", sp_rank)
     logger.info("=" * 60)
+
+
+@pytest.mark.parametrize(
+    "S, grid, C, sp_size, sp_rank",
+    [
+        (30, (2, 3, 4), 128, 1, 0),  # 6 padding tokens after the grid
+        (40, (5, 4, 3), 128, 2, 1),  # rank 1 holds tokens 40..79 of 60
+        (32, (2, 4, 4), 256, 1, 0),  # 128 channel pairs
+    ],
+)
+def test_rope_fwd_3d_all_outputs(S, grid, C, sp_size, sp_rank):
+    # Every output element is written. Padding tokens are copied from x.
+    torch.manual_seed(0)
+    N = 2
+    x = torch.randn(1, S, N, C, dtype=torch.float32, device="cuda")
+    grid_sizes = torch.tensor([grid], dtype=torch.int32, device="cuda")
+    c = C // 2
+    c1, c2 = c - 2 * (c // 3), c // 3
+    freqs = torch.cat(
+        [
+            rope_3d_params(64, 2 * c1, device="cuda"),
+            rope_3d_params(64, 2 * c2, device="cuda"),
+            rope_3d_params(64, 2 * c2, device="cuda"),
+        ],
+        dim=1,
+    )
+    out_ref = rope_fwd_3d_torch(x, grid_sizes, freqs, sp_size, sp_rank)
+    out_triton = rope_fwd_3d(x, grid_sizes, freqs, sp_size, sp_rank)
+    torch.testing.assert_close(out_triton, out_ref, atol=1e-4, rtol=1e-4)

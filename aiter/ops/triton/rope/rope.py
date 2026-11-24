@@ -1573,7 +1573,8 @@ def rope_fwd_3d(
     freqs_imag = freqs.imag.to(dtype=torch.float32, device=device).contiguous()
     out = torch.empty_like(x, dtype=torch.float32, device=device)
 
-    BLOCK_L, BLOCK_N, BLOCK_C = 32, 4, 64
+    # One block covers all C / 2 channel pairs of a head.
+    BLOCK_L, BLOCK_N, BLOCK_C = 32, 4, triton.next_power_of_2(c_total)
 
     grid = (B, n_heads, triton.cdiv(s, BLOCK_L))
 

@@ -2254,7 +2254,9 @@ def _rope_fwd_3d(
     freq_row = tl.where(c_b < C1, f_idx, tl.where(c_b < C1 + C2, h_idx, w_idx))
     freq_row = tl.where(freq_row >= max_freq_seq_len, max_freq_seq_len - 1, freq_row)
 
-    mask_rope = s_mask[:, None] & c_mask[None, :] & n_mask & valid_global_tid[:, :]
+    # Tokens past the grid (padding) get the pad frequency, so they are copied.
+    mask_io = s_mask[:, None] & c_mask[None, :] & n_mask
+    mask_rope = mask_io & valid_global_tid
 
     # load freqs_real and freqs_imag
     off_freq = freq_row * stride_freqs_s + c_b * stride_freqs_c
@@ -2265,8 +2267,8 @@ def _rope_fwd_3d(
     off_x_r = off_x_base + l_b * stride_x_l + (2 * c_b) * stride_x_c
     off_x_i = off_x_base + l_b * stride_x_l + (2 * c_b + 1) * stride_x_c
 
-    x_r = tl.load(x_ptr + off_x_r, mask=mask_rope, other=0.0)
-    x_i = tl.load(x_ptr + off_x_i, mask=mask_rope, other=0.0)
+    x_r = tl.load(x_ptr + off_x_r, mask=mask_io, other=0.0)
+    x_i = tl.load(x_ptr + off_x_i, mask=mask_io, other=0.0)
 
     # complex number multiplication
     out_r = x_r * freq_r - x_i * freq_i
@@ -2277,5 +2279,5 @@ def _rope_fwd_3d(
     off_out_r = off_out_base + l_b * stride_out_l + (2 * c_b) * stride_out_c
     off_out_i = off_out_base + l_b * stride_out_l + (2 * c_b + 1) * stride_out_c
 
-    tl.store(out_ptr + off_out_r, out_r, mask=mask_rope)
-    tl.store(out_ptr + off_out_i, out_i, mask=mask_rope)
+    tl.store(out_ptr + off_out_r, out_r, mask=mask_io)
+    tl.store(out_ptr + off_out_i, out_i, mask=mask_io)
