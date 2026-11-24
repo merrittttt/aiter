@@ -54,10 +54,16 @@ void fused_qk_norm_mrope_3d_cache_pts_quant_shuffle(aiter_tensor_t& qkv,
     // not just dim 0. Missing dims pass 0, which the kernel treats as "assume contiguous".
     int64_t k_block_stride_ = k_cache.stride(0);
     int64_t v_block_stride_ = v_cache.stride(0);
-    int64_t k_token_stride_ = k_cache.dim() >= 2 ? k_cache.stride(1) : 0;
-    int64_t v_token_stride_ = v_cache.dim() >= 2 ? v_cache.stride(1) : 0;
-    int64_t k_head_stride_  = k_cache.dim() >= 3 ? k_cache.stride(2) : 0;
-    int64_t v_head_stride_  = v_cache.dim() >= 3 ? v_cache.stride(2) : 0;
+    // A non-paged cache (block_size == 0) is [num_slots, num_heads, head_size], so its
+    // token and head dims are 0 and 1, not 1 and 2. A dim counts only if a dim follows it.
+    int const token_dim     = block_size == 0 ? 0 : 1;
+    auto dim_stride         = [](aiter_tensor_t const& t, int d) -> int64_t {
+        return t.dim() > d + 1 ? t.stride(d) : 0;
+    };
+    int64_t k_token_stride_ = dim_stride(k_cache, token_dim);
+    int64_t v_token_stride_ = dim_stride(v_cache, token_dim);
+    int64_t k_head_stride_  = dim_stride(k_cache, token_dim + 1);
+    int64_t v_head_stride_  = dim_stride(v_cache, token_dim + 1);
     std::array<int64_t, 3> mrope_section;
     mrope_section[0] = mrope_section_[0];
     mrope_section[1] = mrope_section_[1];

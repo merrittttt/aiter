@@ -3361,12 +3361,19 @@ void fused_qk_norm_rope_cache_pts_quant_shuffle(aiter_tensor_t& qkv,
         quant_q ? reinterpret_cast<const float*>(per_tensor_q_scale->data_ptr()) : nullptr;
     // K/V cache indexing is stride-aware in block/token/head (innermost head_size
     // assumed contiguous), so most future KV layout changes need no change here.
+    // A paged cache is [num_blocks, block_size, num_heads, head_size], a non-paged one
+    // (block_size == 0) is [num_slots, num_heads, head_size]: the token and head dims
+    // follow token_dim. A missing dim passes 0, which the kernel reads as contiguous.
+    int const token_dim = block_size == 0 ? 0 : 1;
+    auto dim_stride     = [](aiter_tensor_t const& t, int d) -> int64_t {
+        return t.dim() > d + 1 ? t.stride(d) : 0;
+    };
     int64_t k_cache_block_stride = k_cache.stride(0);
     int64_t v_cache_block_stride = v_cache.stride(0);
-    int64_t k_cache_token_stride = k_cache.stride(1);
-    int64_t k_cache_head_stride  = k_cache.stride(2);
-    int64_t v_cache_token_stride = v_cache.stride(1);
-    int64_t v_cache_head_stride  = v_cache.stride(2);
+    int64_t k_cache_token_stride = dim_stride(k_cache, token_dim);
+    int64_t k_cache_head_stride  = dim_stride(k_cache, token_dim + 1);
+    int64_t v_cache_token_stride = dim_stride(v_cache, token_dim);
+    int64_t v_cache_head_stride  = dim_stride(v_cache, token_dim + 1);
     VLLM_DISPATCH_FLOATING_TYPES_rmTorch(
         qkv_dtype, "fused_qk_norm_rope_cache_pts_quant_shuffle", [&] {
             using T = scalar_t;

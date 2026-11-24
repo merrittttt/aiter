@@ -923,6 +923,10 @@ def _default_cases():
         _case(
             fp8, 127, 32, 1, 128, [24, 20, 20], return_kv=False, use_strided_layout=True
         ),
+        # Non-paged [num_slots, num_heads, head_size] KV cache (block_size 0), more
+        # than one KV head
+        dict(_case(bf16, 127, 8, 2, 128, [4, 6, 6]), use_shuffle_layout=False),
+        dict(_case(fp8, 127, 8, 2, 128, None), use_shuffle_layout=False),
         # Partial rotary RoPE / MRoPE (Qwen3.5: head_size=256, rotary_dim=64)
         _case(fp8, 1257, 32, 4, 256, None, rotary_dim=64),
         _case(bf16, 3, 8, 2, 128, None, rotary_dim=32, neox=False),
